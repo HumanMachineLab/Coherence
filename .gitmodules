@@ -1,0 +1,3 @@
+[submodule "src/bertkeywords"]
+	path = src/bertkeywords
+	url = https://github.com/HumanMachineLab/BERTKeywords
