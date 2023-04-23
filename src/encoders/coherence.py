@@ -4,16 +4,29 @@ from src.bertkeywords.src.keywords import Keywords
 from src.dataset.utils import dedupe_list, flatten, truncate_string, truncate_by_token
 import time
 
+supported_models = [
+    "sentence-transformers/LaBSE",
+    "bert-base-uncased",
+    "roberta-base",
+    "sentence-transformers/all-MiniLM-L6-v2",
+]
+
 
 class Coherence:
-    def __init__(self, max_words_per_step=2, coherence_threshold=0.4):
+    def __init__(
+        self,
+        max_words_per_step=2,
+        coherence_threshold=0.4,
+        model_string="bert-base-uncased",
+    ):
         self.max_words_per_step = max_words_per_step
         self.coherence_threshold = coherence_threshold
-        # similarities_lib = Similarities("sentence-transformers/LaBSE")
-        similarities_lib = Similarities("bert-base-uncased")
-        # similarities_lib = Similarities("roberta-base")
-        # similarities_lib = Similarities("sentence-transformers/all-MiniLM-L6-v2")
-        # similarities_lib = Similarities("Dimitre/universal-sentence-encoder")
+        self.model_string = model_string
+
+        if model_string not in supported_models:
+            self.model_string = "bert-base-uncased"
+
+        similarities_lib = Similarities(self.model_string)
 
         self.keywords_lib = Keywords(similarities_lib.model, similarities_lib.tokenizer)
         self.embedding_lib = Embedding(
