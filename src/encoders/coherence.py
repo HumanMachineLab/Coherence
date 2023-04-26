@@ -139,7 +139,8 @@ class Coherence:
         coherence_map,
         keywords_current,
         suppress_errors=True,
-        same_word_multiplier=True,
+        same_word_multiplier=2,  # if set to 1, don't amplify the same words found
+        no_same_word_penalty=1,  # if set to 1, don't penalize for not finding the same word.
     ):
         word_comparisons = []
         weights = []
@@ -152,12 +153,13 @@ class Coherence:
                 word = word_tuple[0]
                 for second_word_tuple in keywords_current:
                     second_word = second_word_tuple[0]
+                    second_word_importance = second_word_tuple[1]
 
                     try:
                         word_one_emb = word_tuple[2]
                         word_two_emb = second_word_tuple[2]
 
-                        if same_word_multiplier:
+                        if same_word_multiplier > 1:
                             flattened_coherence_words_only = [
                                 element[0]
                                 for sublist in coherence_map
@@ -168,17 +170,17 @@ class Coherence:
                                 second_word
                             )
 
-                            multiplier = 2
                             if num_occurrences > 0:
                                 # amplify words that are found as duplicates in the coherence map
                                 # if the word shows up 1 time, amplify the weight by 2 times
                                 weighting_multiplier = (
                                     flattened_coherence_words_only.count(second_word)
-                                    + (multiplier - 1)
+                                    + (same_word_multiplier - 1)
                                 )
                             else:
+                                # no same word penalty
                                 weighting_multiplier = (
-                                    1 / multiplier
+                                    1 / no_same_word_penalty
                                 )  # reduce the importance of this word
 
                         else:
@@ -192,6 +194,9 @@ class Coherence:
                             weight = (weighting_multiplier * 2) / (i + 1)
                         else:
                             weight = (weighting_multiplier * 1) / (i + 1)
+
+                        # multiply the weighting factor by the importance of the second word
+                        weight *= second_word_importance
 
                         word_comparisons.append(
                             (
@@ -212,18 +217,19 @@ class Coherence:
         self,
         text_data,
         max_tokens=256,
-        prediction_thresh=0.3,
-        pruning=1,
-        pruning_min=4,
+        prediction_threshold=0.25,
+        coherence_dump_on_prediction=False,
+        pruning=1,  # remove one sentence worth of keywords
+        pruning_min=7,  # remove the first sentence in the coherence map once it grows passed 6
+        dynamic_threshold=False,
         threshold_warmup=10,  # number of iterations before using dynamic threshold
         last_n_threshold=5,  # will only consider the last n thresholds for dynamic threshold
-        dynamic_threshold=False,
     ):
         coherence_map = []
         predictions = []
         thresholds = []
         for i, row in enumerate(text_data):
-            threshold = prediction_thresh
+            threshold = prediction_threshold
 
             # dynamic threshold calculations
             if dynamic_threshold and (i + 1) > threshold_warmup:
@@ -277,81 +283,12 @@ class Coherence:
                 if avg_similarity > threshold:
                     predictions.append((avg_similarity, 0))
                 else:
-                    # start of a new segment, empty the map
-                    coherence_map = []
+                    if coherence_dump_on_prediction:
+                        # start of a new segment, empty the map
+                        coherence_map = []
                     predictions.append((avg_similarity, 1))
 
                 thresholds.append(avg_similarity)
                 print(".", end="")
-
-        return predictions
-
-    # testing functions
-    def predict_verbose(
-        self,
-        text_data,
-        max_tokens=256,
-        prediction_thresh=0.3,
-        pruning=4,
-        pruning_min=10,
-    ):
-        coherence_map = []
-        predictions = []
-        for i, row in enumerate(text_data):
-            # compare the current sentence to the previous one
-            if i == 0:
-                predictions.append((0, 0))  # predict a 0 since it's the start
-                pass
-            else:
-                prev_row = text_data[i - 1]
-
-                row = truncate_by_token(row, max_tokens)
-                prev_row = truncate_by_token(prev_row, max_tokens)
-
-                # add the keywords to the coherence map
-                coherence_map.extend(
-                    self.get_coherence(
-                        [row, prev_row], coherence_threshold=self.coherence_threshold
-                    )
-                )
-                print(f"Coherence Map: {[[x[0] for x in c] for c in coherence_map]}")
-                if pruning > 0 and len(coherence_map) >= pruning_min:
-                    sorted_map = sorted(
-                        coherence_map, key=lambda tup: tup[1]
-                    )  # sort asc by importance based on keybert
-                    coherence_map = sorted_map[pruning:][
-                        ::-1
-                    ]  # get the last n - pruning values and reverse the list
-
-                # get the keywords for the current sentences
-                keywords_current = self.keywords_lib.get_keywords_with_embeddings(row)
-                keywords_prev = self.keywords_lib.get_keywords_with_embeddings(prev_row)
-                print(
-                    f"Coherence Map: {[[x[0] for x in c] for c in coherence_map]}, Keywords Current: {[x[0] for x in keywords_current]}"
-                )
-
-                # compute the word comparisons between the previous (with the coherence map)
-                # and the current (possibly the first sentence in a new segment)
-                weighted_similarities, weights = self.compare_coherent_words(
-                    [*coherence_map, keywords_prev], keywords_current
-                )
-
-                weighted_similarities = [
-                    comparison[2] for comparison in weighted_similarities
-                ]
-                avg_similarity = self.get_weighted_average(
-                    weighted_similarities, weights
-                )
-
-                # if the two sentences are similar, create a cohesive prediction
-                # otherwise, predict a new segment
-                if avg_similarity > prediction_thresh:
-                    print(f"Similarity: {avg_similarity}, Prediction: {0}")
-                    predictions.append((avg_similarity, 0))
-                else:
-                    # start of a new segment, empty the map
-                    coherence_map = []
-                    print(f"Similarity: {avg_similarity}, Prediction: {1}")
-                    predictions.append((avg_similarity, 1))
 
         return predictions
