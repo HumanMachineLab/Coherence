@@ -149,10 +149,12 @@ raw_data/disease/*
 models/*
 data/*
 logs/*
+predictions/*
 !raw_data/WikiSection/.gitkeep
 !raw_data/disease/.gitkeep
 !raw_data/city/.gitkeep
 !data/.gitkeep
+!predictions/.gitkeep
 !models/.gitkeep
 !logs/.gitkeep
 weights_*
