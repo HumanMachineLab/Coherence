@@ -45,9 +45,11 @@ class Coherence:
         self, prev_sentence, curr_sentence, coherence_threshold
     ):
         if self.kb_embeddings:
-            embedding_technique = self.keywords_lib.get_keywords_with_embeddings
+            embedding_technique = self.keywords_lib.get_random_keywords_with_embeddings
         else:
-            embedding_technique = self.keywords_lib.get_keywords_with_kb_embeddings
+            embedding_technique = (
+                self.keywords_lib.get_random_keywords_with_kb_embeddings
+            )
 
         kw_curr_sentence = embedding_technique(curr_sentence)[: self.max_words_per_step]
         kw_prev_sentence = embedding_technique(prev_sentence)[: self.max_words_per_step]
