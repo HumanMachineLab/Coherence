@@ -56,38 +56,19 @@ class Coherence:
 
         for word2 in kw_curr_sentence:
             for word1 in kw_prev_sentence:
-                # check to see if either word by its embedding already exists in the
-                # coherent words so far.
-                skip_comparison = False
-                coherent_word_embeddings_only = [w[2] for w in coherent_words]
-                for we in coherent_word_embeddings_only:
-                    if torch.equal(we, word1[2]) or torch.equal(we, word2[2]):
-                        # the word has already been added
-                        skip_comparison = True
-                        continue
+                # check similarity and add to coherent dictionary
+                emb1 = word1[2]
+                emb2 = word2[2]
+                similarity = torch.cosine_similarity(
+                    emb1.reshape(1, -1), emb2.reshape(1, -1)
+                )
 
-                # # don't consider all numbers because in a pre-trained LLM
-                # # they have no use or meaning.
-                # if word1[0].isnumeric() or word2[0].isnumeric():
-                #     skip_comparison = True
-                #     continue
+                if similarity[0] >= coherence_threshold:
+                    # append the tuple with the embedding for each word that's similar
+                    coherent_words.append((word1[0], word1[1], emb1))
+                    coherent_words.append((word2[0], word2[1], emb2))
 
-                if not skip_comparison:
-                    # check similarity and add to coherent dictionary
-                    emb1 = word1[2]
-                    emb2 = word2[2]
-                    similarity = torch.cosine_similarity(
-                        emb1.reshape(1, -1), emb2.reshape(1, -1)
-                    )
-
-                    if similarity[0] >= coherence_threshold:
-                        # append the tuple with the embedding for each word that's similar
-                        coherent_words.append((word1[0], word1[1], emb1))
-                        coherent_words.append((word2[0], word2[1], emb2))
-
-        # sort by descending to have the most important words first
-        desc_sorted_words = sorted(coherent_words, key=lambda x: x[1])[::-1]
-        return desc_sorted_words, kw_prev_sentence, kw_curr_sentence
+        return coherent_words, kw_prev_sentence, kw_curr_sentence
 
     def get_coherence(self, segment, coherence_threshold: float = 1):
         """creates a list of words that are common and strong in a segment.
@@ -130,10 +111,6 @@ class Coherence:
 
         return coherence_map
 
-    # get the weighted average of keywords collected in the coherence map thus far
-    def get_weighted_average(self, weighted_similarities, weights):
-        return sum(weighted_similarities) / sum(weights)
-
     def compare_coherent_words(
         self,
         coherence_map,
@@ -141,7 +118,6 @@ class Coherence:
         suppress_errors=True,
     ):
         word_comparisons = []
-        weights = []
 
         # reverse the coherence map and iterate through it so we can go through
         # important words from the closest sentences to the furthest sentences.
@@ -157,61 +133,20 @@ class Coherence:
                         word_one_emb = word_tuple[2]
                         word_two_emb = second_word_tuple[2]
 
-                        if self.same_word_multiplier > 1:
-                            flattened_coherence_words_only = [
-                                element[0]
-                                for sublist in coherence_map
-                                for element in sublist
-                            ]
-
-                            num_occurrences = flattened_coherence_words_only.count(
-                                second_word
-                            )
-
-                            if num_occurrences > 0:
-                                # amplify words that are found as duplicates in the coherence map
-                                # if the word shows up 1 time, amplify the weight by 2 times
-                                weighting_multiplier = (
-                                    flattened_coherence_words_only.count(second_word)
-                                    + (self.same_word_multiplier - 1)
-                                )
-                            else:
-                                # no same word penalty
-                                weighting_multiplier = (
-                                    1 / self.no_same_word_penalty
-                                )  # reduce the importance of this word
-
-                        else:
-                            weighting_multiplier = (
-                                1  # set to 1 in case this is turned off.
-                            )
-
-                        # this weight is a recipricol function that will grow smaller the further the keywords are away
-                        # we want to put more importance on the current words, so we apply twice as much weight.
-                        if i == 0:
-                            weight = (weighting_multiplier * 2) / (i + 1)
-                        else:
-                            weight = (weighting_multiplier * 1) / (i + 1)
-
-                        # multiply the weighting factor by the importance of the second word
-                        weight *= second_word_importance
-
                         word_comparisons.append(
                             (
                                 word,
                                 second_word,
-                                weight
-                                * self.embedding_lib.get_similarity(
+                                self.embedding_lib.get_similarity(
                                     word_one_emb, word_two_emb
                                 ),
                             )
                         )
-                        weights.append(weight)
                     except AssertionError as e:
                         if not suppress_errors:
                             print(e, word, second_word)
 
-        return word_comparisons, weights
+        return word_comparisons
 
     def predict(
         self,
@@ -271,16 +206,14 @@ class Coherence:
 
                 # compute the word comparisons between the previous (with the coherence map)
                 # and the current (possibly the first sentence in a new segment)
-                weighted_similarities, weights = self.compare_coherent_words(
+                weighted_similarities = self.compare_coherent_words(
                     [*coherence_map, keywords_prev], keywords_current
                 )
 
                 weighted_similarities = [
                     comparison[2] for comparison in weighted_similarities
                 ]
-                avg_similarity = self.get_weighted_average(
-                    weighted_similarities, weights
-                )
+                avg_similarity = sum(weighted_similarities) / len(weighted_similarities)
 
                 # if the two sentences are similar, create a cohesive prediction
                 # otherwise, predict a new segment
