@@ -188,7 +188,9 @@ class Coherence:
                                 )  # reduce the importance of this word
 
                         else:
-                            weighting_multiplier = 1  # set to 1 in case this is turned off.
+                            weighting_multiplier = (
+                                1  # set to 1 in case this is turned off.
+                            )
 
                         # this weight is a recipricol function that will grow smaller the further the keywords are away
                         # we want to put more importance on the current words, so we apply twice as much weight.
@@ -204,16 +206,10 @@ class Coherence:
                         # iterated over in the coherence map
                         # word_weight (from KB) * weighting_multiplier * similarity
                         word_comparison = weight * self.embedding_lib.get_similarity(
-                                    word_one_emb, word_two_emb
-                                )
-
-                        word_comparisons.append(
-                            (
-                                word,
-                                second_word,
-                                word_comparison
-                            )
+                            word_one_emb, word_two_emb
                         )
+
+                        word_comparisons.append((word, second_word, word_comparison))
 
                         # We need to get the weights and store them for the weighted average later
                         weights.append(weight)
@@ -226,7 +222,7 @@ class Coherence:
     def predict(
         self,
         text_data,
-        max_tokens=256,
+        max_tokens=128,
         prediction_threshold=0.25,
         coherence_dump_on_prediction=False,
         pruning=1,  # remove one sentence worth of keywords
