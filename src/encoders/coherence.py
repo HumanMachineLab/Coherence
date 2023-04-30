@@ -20,6 +20,7 @@ class Coherence:
         same_word_multiplier=2,  # if set to 1, don't amplify the same words found
         no_same_word_penalty=1,  # if set to 1, don't penalize for not finding the same word.
         model_string="bert-base-uncased",
+        kb_embeddings=False,  # if set to True, use the keybert embeddings.
     ):
         self.max_words_per_step = max_words_per_step
         self.coherence_threshold = coherence_threshold
@@ -28,6 +29,7 @@ class Coherence:
         )
         self.no_same_word_penalty = no_same_word_penalty  # if set to 1, don't penalize for not finding the same word.
         self.model_string = model_string
+        self.kb_embeddings = kb_embeddings
 
         if model_string not in supported_models:
             self.model_string = "bert-base-uncased"
@@ -42,12 +44,13 @@ class Coherence:
     def get_similar_coherent_words(
         self, prev_sentence, curr_sentence, coherence_threshold
     ):
-        kw_curr_sentence = self.keywords_lib.get_keywords_with_embeddings(
-            curr_sentence
-        )[: self.max_words_per_step]
-        kw_prev_sentence = self.keywords_lib.get_keywords_with_embeddings(
-            prev_sentence
-        )[: self.max_words_per_step]
+        if self.kb_embeddings:
+            embedding_technique = self.keywords_lib.get_keywords_with_embeddings
+        else:
+            embedding_technique = self.keywords_lib.get_keywords_with_kb_embeddings
+
+        kw_curr_sentence = embedding_technique(curr_sentence)[: self.max_words_per_step]
+        kw_prev_sentence = embedding_technique(prev_sentence)[: self.max_words_per_step]
 
         coherent_words = []
 
