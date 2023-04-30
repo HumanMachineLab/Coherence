@@ -20,40 +20,6 @@ def get_random_hash(k):
     return x
 
 
-def perf_measure(y_actual, y_pred):
-    TP = 0
-    FP = 0
-    TN = 0
-    FN = 0
-
-    for i in range(len(y_pred)):
-        if y_actual[i] == y_pred[i] == 1:
-            TP += 1
-        if y_pred[i] == 1 and y_actual[i] != y_pred[i]:
-            FP += 1
-        if y_actual[i] == y_pred[i] == 0:
-            TN += 1
-        if y_pred[i] == 0 and y_actual[i] != y_pred[i]:
-            FN += 1
-    return (TP, FP, TN, FN)
-
-
-def get_precision(TP, FP, TN, FN):
-    if TP == 0:
-        return 0
-    if TP + FP == 0:
-        return 0
-    return TP / (TP + FP)
-
-
-def get_recall(TP, FP, TN, FN):
-    if TP == 0:
-        return 0
-    if TP + FP == 0:
-        return 0
-    return TP / (TP + FN)
-
-
 experiment_set_hash = get_random_hash(
     5
 )  # global hash for all the experiments during this run.
@@ -70,9 +36,11 @@ class CoherenceExperiment:
     no_same_word_penalty: int = 1
     prediction_threshold: float = 0.25
     coherence_dump_on_prediction: bool = False
-    pruning: int = 1  # remove one sentence worth of keywords
+    pruning: int = (
+        1  # remove one sentence worth of keywords. Set to 0 if pruning is not desired
+    )
     pruning_min: int = (
-        6  # remove the first sentence in the coherence map once it grows passed 6
+        6  # remove the first sentence in the coherence map once it grows past 6
     )
     dynamic_threshold: bool = False
     threshold_warmup: int = 10  # number of iterations before using dynamic threshold
