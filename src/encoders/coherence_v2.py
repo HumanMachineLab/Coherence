@@ -17,11 +17,19 @@ class Coherence:
         self,
         max_words_per_step=2,
         coherence_threshold=0.4,
+        same_word_multiplier=2,  # if set to 1, don't amplify the same words found
+        no_same_word_penalty=1,  # if set to 1, don't penalize for not finding the same word.
         model_string="bert-base-uncased",
+        kb_embeddings=False,  # if set to True, use the keybert embeddings.
     ):
         self.max_words_per_step = max_words_per_step
         self.coherence_threshold = coherence_threshold
+        self.same_word_multiplier = (
+            same_word_multiplier  # if set to 1, don't amplify the same words found
+        )
+        self.no_same_word_penalty = no_same_word_penalty  # if set to 1, don't penalize for not finding the same word.
         self.model_string = model_string
+        self.kb_embeddings = kb_embeddings
 
         if model_string not in supported_models:
             self.model_string = "bert-base-uncased"
@@ -36,21 +44,16 @@ class Coherence:
     def get_similar_coherent_words(
         self, prev_sentence, curr_sentence, coherence_threshold
     ):
-        tic = time.perf_counter()
-        kw_curr_sentence = self.keywords_lib.get_keywords_with_embeddings(
-            curr_sentence
-        )[: self.max_words_per_step]
-        kw_prev_sentence = self.keywords_lib.get_keywords_with_embeddings(
-            prev_sentence
-        )[: self.max_words_per_step]
-        print([x[0] for x in kw_curr_sentence], curr_sentence)
-        print([x[0] for x in kw_prev_sentence], prev_sentence)
-        toc = time.perf_counter()
-        print(f"Got the keywords in {toc - tic:0.4f} seconds")
+        if self.kb_embeddings:
+            embedding_technique = self.keywords_lib.get_keywords_with_embeddings
+        else:
+            embedding_technique = self.keywords_lib.get_keywords_with_kb_embeddings
+
+        kw_curr_sentence = embedding_technique(curr_sentence)[: self.max_words_per_step]
+        kw_prev_sentence = embedding_technique(prev_sentence)[: self.max_words_per_step]
 
         coherent_words = []
 
-        tic = time.perf_counter()
         for word2 in kw_curr_sentence:
             for word1 in kw_prev_sentence:
                 # check to see if either word by its embedding already exists in the
@@ -81,9 +84,6 @@ class Coherence:
                         # append the tuple with the embedding for each word that's similar
                         coherent_words.append((word1[0], word1[1], emb1))
                         coherent_words.append((word2[0], word2[1], emb2))
-
-        toc = time.perf_counter()
-        print(f"Got the embeddings and comparisons in {toc - tic:0.4f} seconds")
 
         # sort by descending to have the most important words first
         desc_sorted_words = sorted(coherent_words, key=lambda x: x[1])[::-1]
@@ -139,8 +139,6 @@ class Coherence:
         coherence_map,
         keywords_current,
         suppress_errors=True,
-        same_word_multiplier=2,  # if set to 1, don't amplify the same words found
-        no_same_word_penalty=1,  # if set to 1, don't penalize for not finding the same word.
     ):
         word_comparisons = []
         weights = []
@@ -153,6 +151,7 @@ class Coherence:
                 word = word_tuple[0]
                 for second_word_tuple in keywords_current:
                     second_word = second_word_tuple[0]
+                    second_word_importance = second_word_tuple[1]
 
                     # this is the value that is used to identify the strength of the
                     # word in relation to its sentence as provided by keybert originally
@@ -162,9 +161,7 @@ class Coherence:
                         word_one_emb = word_tuple[2]
                         word_two_emb = second_word_tuple[2]
 
-                        if same_word_multiplier > 1:
-
-                            # get all the text words only in the entire coherence map.
+                        if self.same_word_multiplier > 1:
                             flattened_coherence_words_only = [
                                 element[0]
                                 for sublist in coherence_map
@@ -180,13 +177,14 @@ class Coherence:
                             if num_occurrences > 0:
                                 # amplify words that are found as duplicates in the coherence map
                                 # if the word shows up 1 time, amplify the weight by 2 times
-                                weighting_multiplier = flattened_coherence_words_only.count(
-                                    second_word
-                                ) + (same_word_multiplier - 1)
+                                weighting_multiplier = (
+                                    flattened_coherence_words_only.count(second_word)
+                                    + (self.same_word_multiplier - 1)
+                                )
                             else:
                                 # no same word penalty
                                 weighting_multiplier = (
-                                    1 / no_same_word_penalty
+                                    1 / self.no_same_word_penalty
                                 )  # reduce the importance of this word
 
                         else:
@@ -223,22 +221,25 @@ class Coherence:
                         if not suppress_errors:
                             print(e, word, second_word)
 
+        return word_comparisons, weights
+
     def predict(
         self,
         text_data,
         max_tokens=256,
-        prediction_thresh=0.3,
+        prediction_threshold=0.25,
+        coherence_dump_on_prediction=False,
         pruning=1,  # remove one sentence worth of keywords
-        pruning_min=7,  # remove the first sentence in the coherence map once it grows past 7
+        pruning_min=7,  # remove the first sentence in the coherence map once it grows passed 6
+        dynamic_threshold=False,
         threshold_warmup=10,  # number of iterations before using dynamic threshold
         last_n_threshold=5,  # will only consider the last n thresholds for dynamic threshold
-        dynamic_threshold=False,
     ):
         coherence_map = []
         predictions = []
         thresholds = []
         for i, row in enumerate(text_data):
-            threshold = prediction_thresh
+            threshold = prediction_threshold
 
             # dynamic threshold calculations
             if dynamic_threshold and (i + 1) > threshold_warmup:
@@ -250,7 +251,9 @@ class Coherence:
 
             # compare the current sentence to the previous one
             if i == 0:
-                predictions.append((0, 0))  # predict a 0 since it's the start
+                predictions.append(
+                    (torch.tensor(0, dtype=torch.int8), 0)
+                )  # predict a 0 since it's the start
                 pass
             else:
                 prev_row = text_data[i - 1]
@@ -265,9 +268,12 @@ class Coherence:
 
                 # add the keywords to the coherence map
                 coherence_map.append(cohesion)
+
+                # print("coherence map", coherence_map)
                 if pruning > 0 and len(coherence_map) >= pruning_min:
-                    # get the last n - pruning values and reverse the list
-                    coherence_map = coherence_map[pruning:]  
+                    coherence_map = coherence_map[
+                        pruning:
+                    ]  # get the last n - pruning values and reverse the list
 
                 # get the keywords for the current sentences
                 keywords_current = self.keywords_lib.get_keywords_with_embeddings(row)
@@ -293,8 +299,9 @@ class Coherence:
                 if avg_similarity > threshold:
                     predictions.append((avg_similarity, 0))
                 else:
-                    # start of a new segment, empty the map
-                    coherence_map = []
+                    if coherence_dump_on_prediction:
+                        # start of a new segment, empty the map
+                        coherence_map = []
                     predictions.append((avg_similarity, 1))
 
                 thresholds.append(avg_similarity)
