@@ -9,7 +9,7 @@ sys.path.insert(0, config.root_path)
 
 from db.dbv2 import Table, AugmentedTable, TrainTestTable
 from src.dataset.utils import flatten, dedupe_list, truncate_string
-from src.encoders.coherence import Coherence
+from src.encoders.coherence_v2 import Coherence
 from src.experimentation.prediction_thresholds import thresholds
 
 from utils.metrics import windowdiff, pk
@@ -207,7 +207,7 @@ class SimpleExperiment:
 
             logits = coherence.predict(
                 text_data=segments_to_test,
-                max_tokens=256,
+                max_tokens=128,
                 prediction_threshold=experiment.prediction_threshold,
                 pruning=experiment.pruning,
                 pruning_min=experiment.pruning_min,
