@@ -133,7 +133,7 @@ class SimpleExperiment:
             pk_score = pk(pred_string, true_string, avg_k)
             tn, fp, fn, tp = confusion_matrix(true_labels, modified_predictions).ravel()
             precision, recall, f1, _ = precision_recall_fscore_support(
-                true_labels, modified_predictions, average="macro"
+                true_labels, modified_predictions, average="micro"
             )
 
             # append all the data to an array before converting to a dataframe below
