@@ -45,9 +45,9 @@ class Coherence:
         self, prev_sentence, curr_sentence, coherence_threshold
     ):
         if self.kb_embeddings:
-            embedding_technique = self.keywords_lib.get_keywords_with_embeddings
-        else:
             embedding_technique = self.keywords_lib.get_keywords_with_kb_embeddings
+        else:
+            embedding_technique = self.keywords_lib.get_keywords_with_embeddings
 
         kw_curr_sentence = embedding_technique(curr_sentence)[: self.max_words_per_step]
         kw_prev_sentence = embedding_technique(prev_sentence)[: self.max_words_per_step]
@@ -56,12 +56,15 @@ class Coherence:
 
         for word2 in kw_curr_sentence:
             for word1 in kw_prev_sentence:
+                emb1 = torch.Tensor(word1[2])
+                emb2 = torch.Tensor(word2[2])
+
                 # check to see if either word by its embedding already exists in the
                 # coherent words so far.
                 skip_comparison = False
                 coherent_word_embeddings_only = [w[2] for w in coherent_words]
                 for we in coherent_word_embeddings_only:
-                    if torch.equal(we, word1[2]) or torch.equal(we, word2[2]):
+                    if torch.equal(we, emb1) or torch.equal(we, emb2):
                         # the word has already been added
                         skip_comparison = True
                         continue
@@ -74,8 +77,6 @@ class Coherence:
 
                 if not skip_comparison:
                     # check similarity and add to coherent dictionary
-                    emb1 = word1[2]
-                    emb2 = word2[2]
                     similarity = torch.cosine_similarity(
                         emb1.reshape(1, -1), emb2.reshape(1, -1)
                     )
@@ -270,10 +271,6 @@ class Coherence:
                     coherence_map = coherence_map[
                         pruning:
                     ]  # get the last n - pruning values and reverse the list
-
-                # get the keywords for the current sentences
-                keywords_current = self.keywords_lib.get_keywords_with_embeddings(row)
-                keywords_prev = self.keywords_lib.get_keywords_with_embeddings(prev_row)
 
                 # compute the word comparisons between the previous (with the coherence map)
                 # and the current (possibly the first sentence in a new segment)
