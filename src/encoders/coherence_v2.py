@@ -226,78 +226,94 @@ class Coherence:
         max_tokens=128,
         prediction_threshold=0.25,
         coherence_dump_on_prediction=False,
+        coherence_threshold=0.2,
         pruning=1,  # remove one sentence worth of keywords
         pruning_min=7,  # remove the first sentence in the coherence map once it grows passed 6
         dynamic_threshold=False,
         threshold_warmup=10,  # number of iterations before using dynamic threshold
         last_n_threshold=5,  # will only consider the last n thresholds for dynamic threshold
+        batch_size=1,
     ):
         coherence_map = []
         predictions = []
         thresholds = []
-        for i, row in enumerate(text_data):
-            threshold = prediction_threshold
+        prev_sentence = None
 
-            # dynamic threshold calculations
-            if dynamic_threshold and (i + 1) > threshold_warmup:
-                last_n_thresholds = thresholds[(0 - last_n_threshold) :]
-                last_n_thresholds.sort()
-                mid = len(last_n_thresholds) // 2
-                threshold = (last_n_thresholds[mid] + last_n_thresholds[~mid]) / 2
-                print(f"median threshold: {threshold}")
+        # set up batching
+        for batch_num in range(0, len(text_data) // batch_size):
+            # create the current batch to iterate over.
+            # this method relies on previous sentence as it always keeps track
+            curr_batch = text_data[
+                batch_num * batch_size : batch_num * batch_size + batch_size
+            ]
 
-            # compare the current sentence to the previous one
-            if i == 0:
-                predictions.append(
-                    (torch.tensor(0, dtype=torch.int8), 0)
-                )  # predict a 0 since it's the start
-                pass
-            else:
-                prev_row = text_data[i - 1]
+            # start iterating over the current batch
+            for i, row in enumerate(curr_batch):
+                threshold = prediction_threshold
 
-                row = truncate_by_token(row, max_tokens)
-                prev_row = truncate_by_token(prev_row, max_tokens)
+                # dynamic threshold calculations
+                if dynamic_threshold and (i + 1) > threshold_warmup:
+                    last_n_thresholds = thresholds[(0 - last_n_threshold) :]
+                    last_n_thresholds.sort()
+                    mid = len(last_n_thresholds) // 2
+                    threshold = (last_n_thresholds[mid] + last_n_thresholds[~mid]) / 2
+                    print(f"median threshold: {threshold}")
 
-                # add the keywords to the coherence map
-                cohesion, keywords_prev, keywords_current = self.get_coherence(
-                    [row, prev_row], coherence_threshold=0.2
-                )
-
-                # add the keywords to the coherence map
-                coherence_map.append(cohesion)
-
-                # print("coherence map", coherence_map)
-                if pruning > 0 and len(coherence_map) >= pruning_min:
-                    coherence_map = coherence_map[
-                        pruning:
-                    ]  # get the last n - pruning values and reverse the list
-
-                # compute the word comparisons between the previous (with the coherence map)
-                # and the current (possibly the first sentence in a new segment)
-                weighted_similarities, weights = self.compare_coherent_words(
-                    [*coherence_map, keywords_prev], keywords_current
-                )
-
-                weighted_similarities_values_only = [
-                    comparison[2] for comparison in weighted_similarities
-                ]
-
-                # get the average weighted similarity as calculated from above
-                avg_similarity = self.get_weighted_average(
-                    weighted_similarities_values_only, weights
-                )
-
-                # if the two sentences are similar, create a cohesive prediction
-                # otherwise, predict a new segment
-                if avg_similarity > threshold:
-                    predictions.append((avg_similarity, 0))
+                # compare the current sentence to the previous one
+                if prev_sentence is None:
+                    predictions.append(
+                        (torch.tensor(0, dtype=torch.int8), 0)
+                    )  # predict a 0 since it's the start
+                    prev_sentence = row
+                    pass
                 else:
-                    if coherence_dump_on_prediction:
-                        # start of a new segment, empty the map
-                        coherence_map = []
-                    predictions.append((avg_similarity, 1))
+                    row = truncate_by_token(row, max_tokens)
+                    prev_row = truncate_by_token(prev_sentence, max_tokens)
 
-                thresholds.append(avg_similarity)
-                print(".", end="")
+                    # add the keywords to the coherence map
+                    cohesion, keywords_prev, keywords_current = self.get_coherence(
+                        [row, prev_row], coherence_threshold=coherence_threshold
+                    )
+
+                    # add the keywords to the coherence map
+                    coherence_map.append(cohesion)
+
+                    # print("coherence map", coherence_map)
+                    if pruning > 0 and len(coherence_map) >= pruning_min:
+                        coherence_map = coherence_map[
+                            pruning:
+                        ]  # get the last n - pruning values and reverse the list
+
+                    # compute the word comparisons between the previous (with the coherence map)
+                    # and the current (possibly the first sentence in a new segment)
+                    weighted_similarities, weights = self.compare_coherent_words(
+                        [*coherence_map, keywords_prev], keywords_current
+                    )
+
+                    weighted_similarities_values_only = [
+                        comparison[2] for comparison in weighted_similarities
+                    ]
+
+                    # get the average weighted similarity as calculated from above
+                    avg_similarity = self.get_weighted_average(
+                        weighted_similarities_values_only, weights
+                    )
+
+                    # if the two sentences are similar, create a cohesive prediction
+                    # otherwise, predict a new segment
+                    if avg_similarity > threshold:
+                        predictions.append((avg_similarity, 0))
+                    else:
+                        if coherence_dump_on_prediction:
+                            # start of a new segment, empty the map
+                            coherence_map = []
+                        predictions.append((avg_similarity, 1))
+
+                    thresholds.append(avg_similarity)
+                    print(".", end="")
+
+                    prev_sentence = row
+
+            print(f"{batch_num+1}", end="")
 
         return predictions

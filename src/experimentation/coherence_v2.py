@@ -35,6 +35,7 @@ class CoherenceExperiment:
     same_word_multiplier: int = 2
     no_same_word_penalty: int = 1
     prediction_threshold: float = 0.25
+    coherence_threshold: float = 0.2
     coherence_dump_on_prediction: bool = False
     pruning: int = (
         1  # remove one sentence worth of keywords. Set to 0 if pruning is not desired
@@ -49,6 +50,7 @@ class CoherenceExperiment:
     )
     kb_embeddings: bool = False  # whether to use the built in keybert embeddings (less accurate, but faster)
     experiment_hash: str = None  # a unique identifier for the experiment
+    batch_size: int = 1  # number of samples to pull keywords from at a time.
 
 
 class SimpleExperiment:
@@ -211,7 +213,9 @@ class SimpleExperiment:
                 prediction_threshold=experiment.prediction_threshold,
                 pruning=experiment.pruning,
                 pruning_min=experiment.pruning_min,
-                coherence_dump_on_prediction=False,
+                coherence_dump_on_prediction=experiment.coherence_dump_on_prediction,
+                coherence_threshold=experiment.coherence_threshold,
+                batch_size=experiment.batch_size,
             )
 
             self.log_predictions(experiment, logits, labels_to_test)
