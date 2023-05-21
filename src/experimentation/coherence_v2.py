@@ -72,6 +72,10 @@ class SimpleExperiment:
             config.root_path, experiment_set_hash
         )
 
+        print("predictions complete...")
+        print(len(predictions))
+        print(len(true_labels))
+
         if not os.path.exists(predictions_directory):
             os.makedirs(predictions_directory)
 
@@ -175,6 +179,9 @@ class SimpleExperiment:
         # append data frame to CSV file
         df_evaluation_set.to_csv(evaluation_file, mode="a", index=False, header=hdr)
 
+        print("pk score:", pk_score)
+        print("wd score:", wd_score)
+
     # run the actual experiment
     def run(self):
         print(f"Running experiment set: {experiment_set_hash}")
@@ -199,26 +206,36 @@ class SimpleExperiment:
                 experiment.start : experiment.start + experiment.num_samples
             ]
 
+            batch_segments_to_test = segments_to_test[
+                0 : experiment.batch_size
+                * (len(segments_to_test) // experiment.batch_size)
+            ]
+            batch_labels_to_test = labels_to_test[
+                0 : experiment.batch_size
+                * (len(labels_to_test) // experiment.batch_size)
+            ]
+
             # initialize the coherence library
             coherence = Coherence(
                 max_words_per_step=experiment.max_words_per_step,
                 same_word_multiplier=experiment.same_word_multiplier,
                 no_same_word_penalty=experiment.no_same_word_penalty,
                 model_string=experiment.model_string,
+                coherence_threshold=experiment.coherence_threshold,
+                kb_embeddings=experiment.kb_embeddings,
             )
 
             logits = coherence.predict(
-                text_data=segments_to_test,
+                text_data=batch_segments_to_test,
                 max_tokens=128,
                 prediction_threshold=experiment.prediction_threshold,
                 pruning=experiment.pruning,
                 pruning_min=experiment.pruning_min,
                 coherence_dump_on_prediction=experiment.coherence_dump_on_prediction,
-                coherence_threshold=experiment.coherence_threshold,
                 batch_size=experiment.batch_size,
             )
 
-            self.log_predictions(experiment, logits, labels_to_test)
+            self.log_predictions(experiment, logits, batch_labels_to_test)
 
             print(f"\nExperiment {i+1} complete.")
             print("==============================================\n")

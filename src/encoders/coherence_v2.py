@@ -16,7 +16,7 @@ class Coherence:
     def __init__(
         self,
         max_words_per_step=2,
-        coherence_threshold=0.4,
+        coherence_threshold=0.2,
         same_word_multiplier=2,  # if set to 1, don't amplify the same words found
         no_same_word_penalty=1,  # if set to 1, don't penalize for not finding the same word.
         model_string="bert-base-uncased",
@@ -41,17 +41,9 @@ class Coherence:
             similarities_lib.model, similarities_lib.tokenizer
         )
 
-    def get_similar_coherent_words(
-        self, prev_sentence, curr_sentence, coherence_threshold
-    ):
-        if self.kb_embeddings:
-            embedding_technique = self.keywords_lib.get_keywords_with_kb_embeddings
-        else:
-            embedding_technique = self.keywords_lib.get_keywords_with_embeddings
+        self.prev_sentence = None
 
-        kw_curr_sentence = embedding_technique(curr_sentence)[: self.max_words_per_step]
-        kw_prev_sentence = embedding_technique(prev_sentence)[: self.max_words_per_step]
-
+    def get_similar_coherent_words(self, kw_prev_sentence, kw_curr_sentence):
         coherent_words = []
 
         for word2 in kw_curr_sentence:
@@ -81,7 +73,7 @@ class Coherence:
                         emb1.reshape(1, -1), emb2.reshape(1, -1)
                     )
 
-                    if similarity[0] >= coherence_threshold:
+                    if similarity[0] >= self.coherence_threshold:
                         # append the tuple with the embedding for each word that's similar
                         coherent_words.append((word1[0], word1[1], emb1))
                         coherent_words.append((word2[0], word2[1], emb2))
@@ -90,7 +82,7 @@ class Coherence:
         desc_sorted_words = sorted(coherent_words, key=lambda x: x[1])[::-1]
         return desc_sorted_words, kw_prev_sentence, kw_curr_sentence
 
-    def get_coherence(self, segment, coherence_threshold: float = 1):
+    def get_coherence(self, sentences):
         """creates a list of words that are common and strong in a segment.
 
         Args:
@@ -101,25 +93,28 @@ class Coherence:
             list: list of words that are considered high coherence in the segment
         """
         cohesion = []
-        prev_sentence = None
-        for sentence in segment:
-            if prev_sentence is None:
-                prev_sentence = sentence
+
+        for sentence in sentences:
+            if self.prev_sentence is None:
+                # we need to assign this to a class variable to retain previous sentence
+                # between calls since this will be called in batches
+                self.prev_sentence = sentence
+                cohesion.append(None)
                 continue
             else:
-                (
-                    coherent_words,
-                    kw_prev_sentence,
-                    kw_curr_sentence,
-                ) = self.get_similar_coherent_words(
-                    prev_sentence, sentence, coherence_threshold
-                )[
-                    : self.max_words_per_step
-                ]
-                cohesion.extend(coherent_words)
-                prev_sentence = sentence
+                kw_curr_sentence = sentence
+                kw_prev_sentence = self.prev_sentence
 
-        return cohesion[: self.max_words_per_step], kw_prev_sentence, kw_curr_sentence
+                # get all the cohesive words as dictated by the coherence_threshold
+                coherent_words = self.get_similar_coherent_words(
+                    kw_prev_sentence, kw_curr_sentence
+                )[: self.max_words_per_step]
+
+                # add the words to the cohesion map for this run.
+                cohesion.append(coherent_words[: self.max_words_per_step])
+                self.prev_sentence = sentence
+
+        return cohesion
 
     def get_coherence_map(
         self,
@@ -207,7 +202,7 @@ class Coherence:
                         # iterated over in the coherence map
                         # word_weight (from KB) * weighting_multiplier * similarity
                         word_comparison = weight * self.embedding_lib.get_similarity(
-                            word_one_emb, word_two_emb
+                            torch.Tensor(word_one_emb), torch.Tensor(word_two_emb)
                         )
 
                         word_comparisons.append((word, second_word, word_comparison))
@@ -226,7 +221,6 @@ class Coherence:
         max_tokens=128,
         prediction_threshold=0.25,
         coherence_dump_on_prediction=False,
-        coherence_threshold=0.2,
         pruning=1,  # remove one sentence worth of keywords
         pruning_min=7,  # remove the first sentence in the coherence map once it grows passed 6
         dynamic_threshold=False,
@@ -240,15 +234,35 @@ class Coherence:
         prev_sentence = None
 
         # set up batching
-        for batch_num in range(0, len(text_data) // batch_size):
+        for j, batch_num in enumerate(range(0, len(text_data) // batch_size)):
+            print(f" {batch_num * batch_size} : {batch_num * batch_size + batch_size}")
+            print(f"iteration:{j+1}")
             # create the current batch to iterate over.
             # this method relies on previous sentence as it always keeps track
             curr_batch = text_data[
                 batch_num * batch_size : batch_num * batch_size + batch_size
             ]
 
+            curr_batch = [truncate_by_token(x, max_tokens) for x in curr_batch]
+
+            # get the keywords for the batch
+            if self.kb_embeddings:
+                embedding_technique = (
+                    self.keywords_lib.get_batch_keywords_with_kb_embeddings
+                )
+            else:
+                embedding_technique = (
+                    self.keywords_lib.get_batch_keywords_with_embeddings
+                )
+
+            # print("current batch", curr_batch)
+            batch_keywords = embedding_technique(curr_batch)[: self.max_words_per_step]
+
+            # add the keywords to the coherence map
+            cohesion = self.get_coherence(batch_keywords)
+
             # start iterating over the current batch
-            for i, row in enumerate(curr_batch):
+            for i, (row, curr_coherence) in enumerate(zip(batch_keywords, cohesion)):
                 threshold = prediction_threshold
 
                 # dynamic threshold calculations
@@ -267,16 +281,15 @@ class Coherence:
                     prev_sentence = row
                     pass
                 else:
-                    row = truncate_by_token(row, max_tokens)
-                    prev_row = truncate_by_token(prev_sentence, max_tokens)
+                    prev_row = prev_sentence
+
+                    # # add the keywords to the coherence map
+                    # cohesion, keywords_prev, keywords_current = self.get_coherence(
+                    #     [row, prev_row]
+                    # )
 
                     # add the keywords to the coherence map
-                    cohesion, keywords_prev, keywords_current = self.get_coherence(
-                        [row, prev_row], coherence_threshold=coherence_threshold
-                    )
-
-                    # add the keywords to the coherence map
-                    coherence_map.append(cohesion)
+                    coherence_map.extend(curr_coherence)
 
                     # print("coherence map", coherence_map)
                     if pruning > 0 and len(coherence_map) >= pruning_min:
@@ -287,7 +300,7 @@ class Coherence:
                     # compute the word comparisons between the previous (with the coherence map)
                     # and the current (possibly the first sentence in a new segment)
                     weighted_similarities, weights = self.compare_coherent_words(
-                        [*coherence_map, keywords_prev], keywords_current
+                        [*coherence_map, prev_row], row
                     )
 
                     weighted_similarities_values_only = [
