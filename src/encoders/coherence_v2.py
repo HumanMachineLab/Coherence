@@ -235,8 +235,6 @@ class Coherence:
 
         # set up batching
         for j, batch_num in enumerate(range(0, len(text_data) // batch_size)):
-            print(f" {batch_num * batch_size} : {batch_num * batch_size + batch_size}")
-            print(f"iteration:{j+1}")
             # create the current batch to iterate over.
             # this method relies on previous sentence as it always keeps track
             curr_batch = text_data[
@@ -255,8 +253,10 @@ class Coherence:
                     self.keywords_lib.get_batch_keywords_with_embeddings
                 )
 
-            # print("current batch", curr_batch)
-            batch_keywords = embedding_technique(curr_batch)[: self.max_words_per_step]
+            # get all the keywords per sentence and truncate at max number of words
+            batch_keywords = [
+                x[: self.max_words_per_step] for x in embedding_technique(curr_batch)
+            ]
 
             # add the keywords to the coherence map
             cohesion = self.get_coherence(batch_keywords)
@@ -266,6 +266,9 @@ class Coherence:
                 threshold = prediction_threshold
 
                 # dynamic threshold calculations
+                # for the last n thresholds, put them into an array and use the median
+                # as the new threshold going forward. This allows the system to adapt
+                # to the general coherence of the sentences in the segment.
                 if dynamic_threshold and (i + 1) > threshold_warmup:
                     last_n_thresholds = thresholds[(0 - last_n_threshold) :]
                     last_n_thresholds.sort()
@@ -282,11 +285,6 @@ class Coherence:
                     pass
                 else:
                     prev_row = prev_sentence
-
-                    # # add the keywords to the coherence map
-                    # cohesion, keywords_prev, keywords_current = self.get_coherence(
-                    #     [row, prev_row]
-                    # )
 
                     # add the keywords to the coherence map
                     coherence_map.extend(curr_coherence)
