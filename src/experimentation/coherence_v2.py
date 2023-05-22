@@ -52,6 +52,10 @@ class CoherenceExperiment:
     experiment_hash: str = None  # a unique identifier for the experiment
     batch_size: int = 1  # number of samples to pull keywords from at a time.
 
+    # debugging
+    print_metrics_summary: bool = (False,)
+    print_predictions_summary: bool = (False,)
+
 
 class SimpleExperiment:
     def __init__(self):
@@ -71,10 +75,6 @@ class SimpleExperiment:
         predictions_directory = "{}/predictions/{}".format(
             config.root_path, experiment_set_hash
         )
-
-        print("predictions complete...")
-        print(len(predictions))
-        print(len(true_labels))
 
         if not os.path.exists(predictions_directory):
             os.makedirs(predictions_directory)
@@ -120,6 +120,12 @@ class SimpleExperiment:
 
         df_data = []
 
+        if experiment.print_metrics_summary:
+            print("============= Metrics Summary =============")
+
+        lowest_pk = 1
+        lowest_pred_thresh = 1
+        best_predictions = None
         for pred_thresh in curr_model_thresholds:
             # calculate the predictions based on the current threshold
             modified_predictions = [
@@ -159,6 +165,17 @@ class SimpleExperiment:
                 ]
             )
 
+            if experiment.print_metrics_summary:
+                # calculate lowest pred thresh and pk for summary printing
+                if pk_score < lowest_pk:
+                    lowest_pred_thresh = pred_thresh
+                    lowest_pk = pk_score
+                    best_predictions = modified_predictions
+                print("prediction threshold:", pred_thresh)
+                print("pk score:", pk_score)
+                print("wd score:", wd_score)
+                print("==========================")
+
         df_evaluation_set = pd.DataFrame(
             df_data,
             columns=[
@@ -179,8 +196,13 @@ class SimpleExperiment:
         # append data frame to CSV file
         df_evaluation_set.to_csv(evaluation_file, mode="a", index=False, header=hdr)
 
-        print("pk score:", pk_score)
-        print("wd score:", wd_score)
+        if experiment.print_predictions_summary:
+            print("============= Predictions Summary =============")
+            print(
+                f"best pk: {lowest_pk}, best prediction threshold: {lowest_pred_thresh}"
+            )
+            print(f"P:{best_predictions}")
+            print(f"R:{true_labels}")
 
     # run the actual experiment
     def run(self):
@@ -237,5 +259,5 @@ class SimpleExperiment:
 
             self.log_predictions(experiment, logits, batch_labels_to_test)
 
-            print(f"\nExperiment {i+1} complete.")
+            print(f"\nExperiment {i+1} - {experiment.experiment_hash} complete.")
             print("==============================================\n")
