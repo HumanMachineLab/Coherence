@@ -52,6 +52,10 @@ class CoherenceExperiment:
     experiment_hash: str = None  # a unique identifier for the experiment
     batch_size: int = 1  # number of samples to pull keywords from at a time.
 
+    keyword_diversity: float = (
+        0.0  # diversity value for mmr. the higher, the more diverse the keywords are.
+    )
+
     # debugging
     print_metrics_summary: bool = (False,)
     print_predictions_summary: bool = (False,)
@@ -121,6 +125,7 @@ class SimpleExperiment:
         df_data = []
 
         if experiment.print_metrics_summary:
+            print()
             print("============= Metrics Summary =============")
 
         lowest_pk = 1
@@ -245,6 +250,7 @@ class SimpleExperiment:
                 model_string=experiment.model_string,
                 coherence_threshold=experiment.coherence_threshold,
                 kb_embeddings=experiment.kb_embeddings,
+                keyword_diversity=experiment.keyword_diversity,
             )
 
             logits = coherence.predict(

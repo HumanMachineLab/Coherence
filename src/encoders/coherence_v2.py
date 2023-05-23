@@ -21,6 +21,7 @@ class Coherence:
         no_same_word_penalty=1,  # if set to 1, don't penalize for not finding the same word.
         model_string="bert-base-uncased",
         kb_embeddings=False,  # if set to True, use the keybert embeddings.
+        keyword_diversity=0.0,
     ):
         self.max_words_per_step = max_words_per_step
         self.coherence_threshold = coherence_threshold
@@ -30,6 +31,7 @@ class Coherence:
         self.no_same_word_penalty = no_same_word_penalty  # if set to 1, don't penalize for not finding the same word.
         self.model_string = model_string
         self.kb_embeddings = kb_embeddings
+        self.keyword_diversity = keyword_diversity
 
         if model_string not in supported_models:
             self.model_string = "bert-base-uncased"
@@ -255,7 +257,10 @@ class Coherence:
 
             # get all the keywords per sentence and truncate at max number of words
             batch_keywords = [
-                x[: self.max_words_per_step] for x in embedding_technique(curr_batch)
+                x[: self.max_words_per_step]
+                for x in embedding_technique(
+                    curr_batch, diversity=self.keyword_diversity
+                )
             ]
 
             # add the keywords to the coherence map
