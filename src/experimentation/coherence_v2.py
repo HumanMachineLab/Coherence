@@ -179,6 +179,7 @@ class SimpleExperiment:
                 print("prediction threshold:", pred_thresh)
                 print("pk score:", pk_score)
                 print("wd score:", wd_score)
+                print("f1 score:", f1)
                 print("==========================")
 
         df_evaluation_set = pd.DataFrame(

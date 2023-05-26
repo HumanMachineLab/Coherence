@@ -291,13 +291,16 @@ class Coherence:
                 else:
                     prev_row = prev_sentence
 
+                    # print("cohesion", curr_coherence)
+
                     # add the keywords to the coherence map
                     coherence_map.extend(curr_coherence)
+                    # print("CM", [[x[0] for x in y] for y in coherence_map])
 
                     # print("coherence map", coherence_map)
                     if pruning > 0 and len(coherence_map) >= pruning_min:
                         coherence_map = coherence_map[
-                            pruning:
+                            -pruning:
                         ]  # get the last n - pruning values and reverse the list
 
                     # compute the word comparisons between the previous (with the coherence map)
@@ -330,6 +333,9 @@ class Coherence:
 
                     prev_sentence = row
 
+            print(
+                f"{batch_num+1} - CM Length: {[len(x) for x in coherence_map]}", end=""
+            )
             print(f"{batch_num+1}", end="")
 
         return predictions
