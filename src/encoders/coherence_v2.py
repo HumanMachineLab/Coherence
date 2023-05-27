@@ -3,10 +3,11 @@ from src.bertkeywords.src.similarities import Embedding, Similarities
 from src.bertkeywords.src.keywords import Keywords
 from src.dataset.utils import dedupe_list, flatten, truncate_string, truncate_by_token
 import time
+import numpy as np
 
 supported_models = [
     "sentence-transformers/LaBSE",
-    "bert-base-uncased",
+    "bert-base-uncased", # default
     "roberta-base",
     "sentence-transformers/all-MiniLM-L6-v2",
 ]
@@ -82,7 +83,7 @@ class Coherence:
 
         # sort by descending to have the most important words first
         desc_sorted_words = sorted(coherent_words, key=lambda x: x[1])[::-1]
-        return desc_sorted_words, kw_prev_sentence, kw_curr_sentence
+        return desc_sorted_words
 
     def get_coherence(self, sentences):
         """creates a list of words that are common and strong in a segment.
@@ -95,6 +96,8 @@ class Coherence:
             list: list of words that are considered high coherence in the segment
         """
         cohesion = []
+
+        # print(f"sentences shape: {np.array(sentences).shape}")
 
         for sentence in sentences:
             if self.prev_sentence is None:
@@ -113,7 +116,7 @@ class Coherence:
                 )[: self.max_words_per_step]
 
                 # add the words to the cohesion map for this run.
-                cohesion.append(coherent_words[: self.max_words_per_step])
+                cohesion.append(coherent_words)
                 self.prev_sentence = sentence
 
         return cohesion
@@ -294,14 +297,14 @@ class Coherence:
                     # print("cohesion", curr_coherence)
 
                     # add the keywords to the coherence map
-                    coherence_map.extend(curr_coherence)
+                    coherence_map.append(curr_coherence)
                     # print("CM", [[x[0] for x in y] for y in coherence_map])
 
                     # print("coherence map", coherence_map)
                     if pruning > 0 and len(coherence_map) >= pruning_min:
                         coherence_map = coherence_map[
-                            -pruning:
-                        ]  # get the last n - pruning values and reverse the list
+                            -(pruning_min - pruning):
+                        ]  # remove the first n (pruning) sentences in the map
 
                     # compute the word comparisons between the previous (with the coherence map)
                     # and the current (possibly the first sentence in a new segment)
@@ -333,9 +336,6 @@ class Coherence:
 
                     prev_sentence = row
 
-            print(
-                f"{batch_num+1} - CM Length: {[len(x) for x in coherence_map]}", end=""
-            )
-            print(f"{batch_num+1}", end="")
+            print(f" BATCH {batch_num+1} ", end="")
 
         return predictions
