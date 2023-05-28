@@ -238,6 +238,8 @@ class Coherence:
         thresholds = []
         prev_sentence = None
 
+        print(f"TOTAL BATCHES: {len(text_data) // batch_size}\n")
+
         # set up batching
         for j, batch_num in enumerate(range(0, len(text_data) // batch_size)):
             # create the current batch to iterate over.
@@ -336,6 +338,6 @@ class Coherence:
 
                     prev_sentence = row
 
-            print(f" BATCH {batch_num+1} ", end="")
+            print(f" {batch_num+1} ", end="")
 
         return predictions
