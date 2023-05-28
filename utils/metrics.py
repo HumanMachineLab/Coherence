@@ -233,3 +233,50 @@ def setup_module(module):
         import numpy
     except ImportError:
         raise SkipTest("numpy is required for nltk.metrics.segmentation")
+
+# returns the number of times a prediction was made correctly exactly, very near, or near the real target
+def get_proximity(predictions, real, proximity=2):
+    exact_matches = 0
+    very_close_matches = 0  # within 1 step
+    close_matches = 0  # within 2 steps
+
+    assert len(predictions) == len(real), "predictions and real should be the same length."
+    for i, (p, r) in enumerate(zip(predictions, real)):
+        # take care of all the cases where we're at the
+        # beginning of the arrays
+        prev_idx = i - 1
+        prev_prev_idx = i - 2
+        if i == 0 or i == 1:
+            prev_idx = 0
+            prev_prev_idx = 0
+
+        prev_prediction = predictions[prev_idx]
+        prev_prev_prediction = predictions[prev_prev_idx]
+
+        # take care of all the cases where we're at the
+        # end of the arrays
+        next_idx = i + 1
+        next_next_idx = i + 2
+        if i == (len(predictions) - 1):
+            next_idx = i
+            next_next_idx = i
+        if i == (len(predictions) - 2):
+            next_idx = i + 1
+            next_next_idx = i + 1
+
+        next_prediction = predictions[next_idx]
+        next_next_prediction = predictions[next_next_idx]
+
+        if r == 1 and p == 1:
+            exact_matches += 1
+            continue
+        if r == 1:
+            if prev_prediction == 1 or next_prediction == 1:
+                very_close_matches += 1
+                continue
+            if prev_prev_prediction == 1 or next_next_prediction == 1:
+                close_matches += 1
+                continue
+            continue
+            
+    return exact_matches, very_close_matches, close_matches
