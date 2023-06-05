@@ -92,7 +92,6 @@ def windowdiff(seg1, seg2, k, boundary="1", weighted=False):
     return wd / (len(seg1) - k + 1.0)
 
 
-
 # Generalized Hamming Distance
 
 
@@ -183,7 +182,6 @@ def ghd(ref, hyp, ins_cost=2.0, del_cost=2.0, shift_cost_coeff=1.0, boundary="1"
     return mat[-1, -1]
 
 
-
 # Beeferman's Pk text segmentation evaluation metric
 
 
@@ -224,7 +222,6 @@ def pk(ref, hyp, k=None, boundary="1"):
     return err / (len(ref) - k + 1.0)
 
 
-
 # skip doctests if numpy is not installed
 def setup_module(module):
     from nose import SkipTest
@@ -234,13 +231,16 @@ def setup_module(module):
     except ImportError:
         raise SkipTest("numpy is required for nltk.metrics.segmentation")
 
+
 # returns the number of times a prediction was made correctly exactly, very near, or near the real target
-def get_proximity(predictions, real, proximity=2):
+def get_proximity(real, predictions, proximity=2):
     exact_matches = 0
     very_close_matches = 0  # within 1 step
     close_matches = 0  # within 2 steps
 
-    assert len(predictions) == len(real), "predictions and real should be the same length."
+    assert len(predictions) == len(
+        real
+    ), "predictions and real should be the same length."
     for i, (p, r) in enumerate(zip(predictions, real)):
         # take care of all the cases where we're at the
         # beginning of the arrays
@@ -278,5 +278,20 @@ def get_proximity(predictions, real, proximity=2):
                 close_matches += 1
                 continue
             continue
-            
-    return exact_matches, very_close_matches, close_matches
+
+    num_positive_predictions = predictions.count(1)
+    num_real_positives = real.count(1)
+
+    proximity = (
+        (1 / 3 * (close_matches / num_real_positives))
+        + (1 / 2 * (very_close_matches / num_real_positives))
+        + (exact_matches / num_real_positives)
+    ) / (
+        (1 / 3 * (close_matches / num_positive_predictions))
+        + (1 / 2 * (very_close_matches / num_positive_predictions))
+        + (exact_matches / num_positive_predictions)
+    )
+
+    proximity *= 100
+
+    return proximity, exact_matches, very_close_matches, close_matches

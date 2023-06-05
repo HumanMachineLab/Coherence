@@ -12,7 +12,7 @@ from src.dataset.utils import flatten, dedupe_list, truncate_string
 from src.encoders.coherence_v2 import Coherence
 from src.experimentation.prediction_thresholds import thresholds
 
-from utils.metrics import windowdiff, pk
+from utils.metrics import windowdiff, pk, get_proximity
 
 
 def get_random_hash(k):
@@ -130,6 +130,7 @@ class SimpleExperiment:
 
         lowest_pk = 1
         lowest_pred_thresh = 1
+        best_proximity = 0
         best_predictions = None
         for pred_thresh in curr_model_thresholds:
             # calculate the predictions based on the current threshold
@@ -152,6 +153,7 @@ class SimpleExperiment:
             precision, recall, f1, _ = precision_recall_fscore_support(
                 true_labels, modified_predictions, average="micro"
             )
+            proximity, _, _, _ = get_proximity(true_labels, modified_predictions)
 
             # append all the data to an array before converting to a dataframe below
             df_data.append(
@@ -167,6 +169,7 @@ class SimpleExperiment:
                     f1,
                     pk_score,
                     wd_score,
+                    proximity,
                 ]
             )
 
@@ -176,10 +179,14 @@ class SimpleExperiment:
                     lowest_pred_thresh = pred_thresh
                     lowest_pk = pk_score
                     best_predictions = modified_predictions
+                    best_proximity = proximity
                 print("prediction threshold:", pred_thresh)
                 print("pk score:", pk_score)
                 print("wd score:", wd_score)
-                print(f"confusion: f1-{f1}, tp-{tp}, fp-{fp}, tn-{tn}, fn-{fn}")
+                print("proximity:", proximity)
+                print(
+                    f"confusion: f1 [{f1}], tp [{tp}], fp [{fp}], tn [{tn}], fn [{fn}]"
+                )
                 print("==========================")
 
         df_evaluation_set = pd.DataFrame(
@@ -207,6 +214,7 @@ class SimpleExperiment:
             print(
                 f"best pk: {lowest_pk}, best prediction threshold: {lowest_pred_thresh}"
             )
+            print(f"Proximity: {best_proximity}")
             print(f"P:{best_predictions}")
             print(f"R:{true_labels}")
 
