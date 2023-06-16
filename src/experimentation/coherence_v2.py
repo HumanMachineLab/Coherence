@@ -203,6 +203,7 @@ class SimpleExperiment:
                 "f1",
                 "Pk",
                 "WindowDiff",
+                "Proximity",
             ],
         )
 
