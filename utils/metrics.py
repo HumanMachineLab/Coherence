@@ -286,7 +286,7 @@ def get_proximity(real, predictions, proximity=2):
         (1 / 3 * (close_matches / num_real_positives))
         + (1 / 2 * (very_close_matches / num_real_positives))
         + (exact_matches / num_real_positives)
-    ) / (
+    ) * (
         (1 / 3 * (close_matches / num_positive_predictions))
         + (1 / 2 * (very_close_matches / num_positive_predictions))
         + (exact_matches / num_positive_predictions)
