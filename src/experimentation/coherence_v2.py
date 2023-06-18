@@ -56,6 +56,9 @@ class CoherenceExperiment:
         0.0  # diversity value for mmr. the higher, the more diverse the keywords are.
     )
 
+    diverse_keywords: bool = False
+    similar_keywords: bool = True
+
     # debugging
     print_metrics_summary: bool = (False,)
     print_predictions_summary: bool = (False,)
@@ -215,7 +218,7 @@ class SimpleExperiment:
             print(
                 f"best pk: {lowest_pk}, best prediction threshold: {lowest_pred_thresh}"
             )
-            print(f"Proximity: {best_proximity}")
+            print(f"Best proximity: {best_proximity}")
             print(f"P:{best_predictions}")
             print(f"R:{true_labels}")
 
@@ -261,6 +264,8 @@ class SimpleExperiment:
                 coherence_threshold=experiment.coherence_threshold,
                 kb_embeddings=experiment.kb_embeddings,
                 keyword_diversity=experiment.keyword_diversity,
+                diverse_keywords=experiment.diverse_keywords,
+                similar_keywords=experiment.similar_keywords,
             )
 
             logits = coherence.predict(

@@ -7,7 +7,7 @@ import numpy as np
 
 supported_models = [
     "sentence-transformers/LaBSE",
-    "bert-base-uncased", # default
+    "bert-base-uncased",  # default
     "roberta-base",
     "sentence-transformers/all-MiniLM-L6-v2",
 ]
@@ -23,6 +23,8 @@ class Coherence:
         model_string="bert-base-uncased",
         kb_embeddings=False,  # if set to True, use the keybert embeddings.
         keyword_diversity=0.0,
+        diverse_keywords=False,
+        similar_keywords=True,
     ):
         self.max_words_per_step = max_words_per_step
         self.coherence_threshold = coherence_threshold
@@ -33,6 +35,9 @@ class Coherence:
         self.model_string = model_string
         self.kb_embeddings = kb_embeddings
         self.keyword_diversity = keyword_diversity
+
+        self.diverse_keywords = diverse_keywords
+        self.similar_keywords = similar_keywords
 
         if model_string not in supported_models:
             self.model_string = "bert-base-uncased"
@@ -264,7 +269,10 @@ class Coherence:
             batch_keywords = [
                 x[: self.max_words_per_step]
                 for x in embedding_technique(
-                    curr_batch, diversity=self.keyword_diversity
+                    curr_batch,
+                    diversity=self.keyword_diversity,
+                    diverse_keywords=self.diverse_keywords,
+                    similar_keywords=self.similar_keywords,
                 )
             ]
 
@@ -305,7 +313,7 @@ class Coherence:
                     # print("coherence map", coherence_map)
                     if pruning > 0 and len(coherence_map) >= pruning_min:
                         coherence_map = coherence_map[
-                            -(pruning_min - pruning):
+                            -(pruning_min - pruning) :
                         ]  # remove the first n (pruning) sentences in the map
 
                     # compute the word comparisons between the previous (with the coherence map)

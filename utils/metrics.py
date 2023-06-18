@@ -292,6 +292,6 @@ def get_proximity(real, predictions, proximity=2):
         + (exact_matches / num_positive_predictions)
     )
 
-    proximity *= 100
+    # proximity *= 100
 
     return proximity, exact_matches, very_close_matches, close_matches
