@@ -136,10 +136,11 @@ class SimpleExperiment:
         lowest_pk = 1
         lowest_pred_thresh = 1
         best_proximity = 0
+        best_overall_score = 1
         best_predictions = None
         pks = []
-        wds= []
-        proximities= []
+        wds = []
+        proximities = []
         for pred_thresh in curr_model_thresholds:
             # calculate the predictions based on the current threshold
             modified_predictions = [
@@ -185,11 +186,12 @@ class SimpleExperiment:
                 ]
             )
             # calculate lowest pred thresh and pk for summary printing
-            if pk_score < lowest_pk:
+            if (pk_score - proximity) < best_overall_score:
                 lowest_pred_thresh = pred_thresh
                 lowest_pk = pk_score
                 best_predictions = modified_predictions
                 best_proximity = proximity
+                best_overall_score = pk_score - proximity
 
             if experiment.print_metrics_summary:
                 print("prediction threshold:", pred_thresh)
@@ -200,7 +202,6 @@ class SimpleExperiment:
                     f"confusion: f1 [{f1}], tp [{tp}], fp [{fp}], tn [{tn}], fn [{fn}]"
                 )
                 print("==========================")
-
 
         df_evaluation_set = pd.DataFrame(
             df_data,
