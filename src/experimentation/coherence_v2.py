@@ -11,6 +11,7 @@ from db.dbv2 import Table, AugmentedTable, TrainTestTable
 from src.dataset.utils import flatten, dedupe_list, truncate_string
 from src.encoders.coherence_v2 import Coherence
 from src.experimentation.prediction_thresholds import thresholds
+from src.experimentation.graphs import display_pk_wd_proximity
 
 from utils.metrics import windowdiff, pk, get_proximity
 
@@ -62,6 +63,7 @@ class CoherenceExperiment:
     # debugging
     print_metrics_summary: bool = (False,)
     print_predictions_summary: bool = (False,)
+    show_graphs: bool = True
 
 
 class SimpleExperiment:
@@ -134,7 +136,11 @@ class SimpleExperiment:
         lowest_pk = 1
         lowest_pred_thresh = 1
         best_proximity = 0
+        best_overall_score = 1
         best_predictions = None
+        pks = []
+        wds = []
+        proximities = []
         for pred_thresh in curr_model_thresholds:
             # calculate the predictions based on the current threshold
             modified_predictions = [
@@ -158,6 +164,10 @@ class SimpleExperiment:
             )
             proximity, _, _, _ = get_proximity(true_labels, modified_predictions)
 
+            pks.append(pk_score)
+            wds.append(wd_score)
+            proximities.append(proximity)
+
             # append all the data to an array before converting to a dataframe below
             df_data.append(
                 [
@@ -175,14 +185,15 @@ class SimpleExperiment:
                     proximity,
                 ]
             )
+            # calculate lowest pred thresh and pk for summary printing
+            if (pk_score - proximity) < best_overall_score:
+                lowest_pred_thresh = pred_thresh
+                lowest_pk = pk_score
+                best_predictions = modified_predictions
+                best_proximity = proximity
+                best_overall_score = pk_score - proximity
 
             if experiment.print_metrics_summary:
-                # calculate lowest pred thresh and pk for summary printing
-                if pk_score < lowest_pk:
-                    lowest_pred_thresh = pred_thresh
-                    lowest_pk = pk_score
-                    best_predictions = modified_predictions
-                    best_proximity = proximity
                 print("prediction threshold:", pred_thresh)
                 print("pk score:", pk_score)
                 print("wd score:", wd_score)
@@ -213,12 +224,14 @@ class SimpleExperiment:
         # append data frame to CSV file
         df_evaluation_set.to_csv(evaluation_file, mode="a", index=False, header=hdr)
 
+        if experiment.show_graphs:
+            display_pk_wd_proximity(curr_model_thresholds, pks, wds, proximities)
+
         if experiment.print_predictions_summary:
             print("============= Predictions Summary =============")
             print(
-                f"best pk: {lowest_pk}, best prediction threshold: {lowest_pred_thresh}"
+                f"best pk: {lowest_pk}, best prediction threshold: {lowest_pred_thresh}, proximity: {best_proximity}"
             )
-            print(f"Best proximity: {best_proximity}")
             print(f"P:{best_predictions}")
             print(f"R:{true_labels}")
 
