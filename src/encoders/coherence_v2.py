@@ -138,7 +138,8 @@ class Coherence:
 
     # get the weighted average of keywords collected in the coherence map thus far
     def get_weighted_average(self, weighted_similarities, weights):
-        return sum(weighted_similarities) / sum(weights)
+        weights_sum = 1 if sum(weights) == 0 else sum(weights)
+        return sum(weighted_similarities) / weights_sum
 
     def compare_coherent_words(
         self,

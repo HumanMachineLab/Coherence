@@ -19,7 +19,10 @@ class DB:
     def __init__(self, dataset_type, table_type=""):
         self.dataset_type = dataset_type
         self.table_type = table_type
-        self.table_name = "wikisection_"+dataset_type
+        if dataset_type in ["city", "diseaase"]:
+            self.table_name = "wikisection_"+dataset_type
+        else:
+            self.table_name = dataset_type
 
         if table_type == "augmented":
             self.table_name += "_gpt_augmented"
@@ -243,6 +246,7 @@ class DB:
 
 class Table(DB):
     def migrate_table(self):
+        print(self.table_name)
         sql_create_table = f""" CREATE TABLE IF NOT EXISTS {self.table_name} (
                                 id integer PRIMARY KEY,
                                 sentence text NOT NULL,

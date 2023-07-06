@@ -98,7 +98,7 @@ class SimpleExperiment:
 
         # add our experiment data to the predictions csv
         experiment_dict["logits"] = [
-            x[0].item() for x in predictions
+            x[0] if isinstance(x[0], float) else x[0].item() for x in predictions
         ]  # convert pytorch tensor to raw primitive type before storage
         experiment_dict["predictions"] = [x[1] for x in predictions]
         experiment_dict["true_labels"] = true_labels
