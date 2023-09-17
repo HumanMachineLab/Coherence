@@ -59,6 +59,7 @@ class CoherenceExperiment:
 
     diverse_keywords: bool = False
     similar_keywords: bool = True
+    ablation: bool = False  # if set to True, remove the coherence map
 
     # debugging
     print_metrics_summary: bool = (False,)
@@ -279,6 +280,7 @@ class SimpleExperiment:
                 keyword_diversity=experiment.keyword_diversity,
                 diverse_keywords=experiment.diverse_keywords,
                 similar_keywords=experiment.similar_keywords,
+                ablation=experiment.ablation,
             )
 
             logits = coherence.predict(

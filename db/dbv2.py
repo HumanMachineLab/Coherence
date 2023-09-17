@@ -19,8 +19,8 @@ class DB:
     def __init__(self, dataset_type, table_type=""):
         self.dataset_type = dataset_type
         self.table_type = table_type
-        if dataset_type in ["city", "diseaase"]:
-            self.table_name = "wikisection_"+dataset_type
+        if dataset_type in ["city", "disease"]:
+            self.table_name = "wikisection_" + dataset_type
         else:
             self.table_name = dataset_type
 
@@ -103,8 +103,7 @@ class DB:
         if len(segment) > 1:
             remaining_segment = []
             for i, sentence in enumerate(segment[1:]):
-                remaining_segment.append(
-                    (sentence, 0, target_sentence_id, i + 1))
+                remaining_segment.append((sentence, 0, target_sentence_id, i + 1))
 
             cur.executemany(sql, remaining_segment)
             self.conn.commit()
@@ -146,8 +145,10 @@ class DB:
         return rows
 
     def get_target_sentence_ids(self, split="test"):
-        train_test_table_name = "wikisection_"+self.dataset_type+"_train_test"
-        sql = f"""SELECT * FROM {train_test_table_name} WHERE type=? ORDER BY RANDOM()"""
+        train_test_table_name = "wikisection_" + self.dataset_type + "_train_test"
+        sql = (
+            f"""SELECT * FROM {train_test_table_name} WHERE type=? ORDER BY RANDOM()"""
+        )
 
         cur = self.conn.cursor()
         cur.execute(sql, (split,))
@@ -157,8 +158,7 @@ class DB:
         return rows
 
     def get_random_target_sentences(self, num_sentences, split="test"):
-        target_sentence_ids = self.get_target_sentence_ids(split)[
-            :num_sentences]
+        target_sentence_ids = self.get_target_sentence_ids(split)[:num_sentences]
         sql = f"""SELECT * FROM {self.table_name} WHERE id=?"""
 
         rows = []
@@ -180,13 +180,11 @@ class DB:
         max_segment_size=1000,
         artificial_segments=False,
     ):
-        target_sentences = self.get_random_target_sentences(
-            num_segments, split)
+        target_sentences = self.get_random_target_sentences(num_segments, split)
         segments = []
         for sentence in target_sentences:
             if not artificial_segments:
-                segments.append(self.get_segment(
-                    sentence[0], max_segment_size))
+                segments.append(self.get_segment(sentence[0], max_segment_size))
             elif artificial_segments:
                 # most segments don't exceed 1000 sentences anyways
                 curr_segment = self.get_segment(sentence[0], 1000)
@@ -199,7 +197,9 @@ class DB:
                         sentence[2] = 1
                         sentence = tuple(sentence)
                     artificial_segment.append(sentence)
-                    if (i+1) % max_segment_size == 0 or (i+1) % len(curr_segment) == 0:
+                    if (i + 1) % max_segment_size == 0 or (i + 1) % len(
+                        curr_segment
+                    ) == 0:
                         # append the accumulated segment and dump
                         segments.append(artificial_segment)
                         artificial_segment = []
@@ -246,7 +246,7 @@ class DB:
 
 class Table(DB):
     def migrate_table(self):
-        print(self.table_name)
+        print("Using dataset: " + self.table_name)
         sql_create_table = f""" CREATE TABLE IF NOT EXISTS {self.table_name} (
                                 id integer PRIMARY KEY,
                                 sentence text NOT NULL,
@@ -262,10 +262,9 @@ class Table(DB):
 
 class AugmentedTable(DB):
     def __init__(self, dataset_type, table_type=""):
-        super().__init__(dataset_type, 'augmented')
+        super().__init__(dataset_type, "augmented")
 
     def migrate_table(self):
-
         sql_create_augmented_table = f"""CREATE TABLE IF NOT EXISTS {self.table_name} (
                                             id integer PRIMARY KEY,
                                             augmented_sentence text NOT NULL,
@@ -300,10 +299,9 @@ class AugmentedTable(DB):
 
 class GTA1Table(DB):
     def __init__(self, dataset_type, table_type=""):
-        super().__init__(dataset_type, 'gta1')
+        super().__init__(dataset_type, "gta1")
 
     def migrate_table(self):
-
         sql_create_gta1_table = f"""CREATE TABLE IF NOT EXISTS {self.table_name} (
                                             id integer PRIMARY KEY,
                                             augmented_sentence text NOT NULL,
@@ -338,10 +336,9 @@ class GTA1Table(DB):
 
 class GTA2Table(DB):
     def __init__(self, dataset_type, table_type=""):
-        super().__init__(dataset_type, 'gta2')
+        super().__init__(dataset_type, "gta2")
 
     def migrate_table(self):
-
         sql_create_gta2_table = f"""CREATE TABLE IF NOT EXISTS {self.table_name} (
                                             id integer PRIMARY KEY,
                                             augmented_sentence text NOT NULL,
@@ -373,12 +370,12 @@ class GTA2Table(DB):
 
         return rows
 
+
 class TestTable(DB):
     def __init__(self, dataset_type, table_type=""):
-        super().__init__(dataset_type, 'test')
+        super().__init__(dataset_type, "test")
 
     def migrate_table(self):
-
         sql_create_test_table = f""" CREATE TABLE IF NOT EXISTS {self.table_name} (
                                 id integer PRIMARY KEY,
                                 sentence text NOT NULL,
@@ -394,10 +391,9 @@ class TestTable(DB):
 
 class ValidationTable(DB):
     def __init__(self, dataset_type, table_type=""):
-        super().__init__(dataset_type, 'validation')
+        super().__init__(dataset_type, "validation")
 
     def migrate_table(self):
-
         sql_create_validation_table = f""" CREATE TABLE IF NOT EXISTS {self.table_name} (
                                 id integer PRIMARY KEY,
                                 sentence text NOT NULL,
@@ -410,9 +406,10 @@ class ValidationTable(DB):
         if self.conn is not None:
             self.create_table(sql_create_validation_table)
 
+
 class TrainTestTable(DB):
     def __init__(self, dataset_type):
-        super().__init__(dataset_type, 'train_test')
+        super().__init__(dataset_type, "train_test")
         self.dataset_type = dataset_type
 
     def migrate_table(self):

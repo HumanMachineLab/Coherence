@@ -25,6 +25,7 @@ class Coherence:
         keyword_diversity=0.0,
         diverse_keywords=False,
         similar_keywords=True,
+        ablation=False,  # remove the coherence if set to True.
     ):
         self.max_words_per_step = max_words_per_step
         self.coherence_threshold = coherence_threshold
@@ -48,6 +49,8 @@ class Coherence:
         self.embedding_lib = Embedding(
             similarities_lib.model, similarities_lib.tokenizer
         )
+
+        self.ablation = ablation
 
         self.prev_sentence = None
 
@@ -305,22 +308,23 @@ class Coherence:
                 else:
                     prev_row = prev_sentence
 
-                    # print("cohesion", curr_coherence)
-
                     # add the keywords to the coherence map
                     coherence_map.append(curr_coherence)
-                    # print("CM", [[x[0] for x in y] for y in coherence_map])
 
-                    # print("coherence map", coherence_map)
                     if pruning > 0 and len(coherence_map) >= pruning_min:
                         coherence_map = coherence_map[
                             -(pruning_min - pruning) :
                         ]  # remove the first n (pruning) sentences in the map
 
+                    # if we are conducting ablation studies, remove the coherence map altogether
+                    if self.ablation:
+                        prev_map = [prev_row]
+                    else:
+                        prev_map = [*coherence_map, prev_row]
                     # compute the word comparisons between the previous (with the coherence map)
                     # and the current (possibly the first sentence in a new segment)
                     weighted_similarities, weights = self.compare_coherent_words(
-                        [*coherence_map, prev_row], row
+                        prev_map, row
                     )
 
                     weighted_similarities_values_only = [
