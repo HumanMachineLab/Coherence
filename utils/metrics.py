@@ -279,8 +279,8 @@ def get_proximity(real, predictions, proximity=2):
                 continue
             continue
 
-    num_positive_predictions = predictions.count(1)
-    num_real_positives = real.count(1)
+    num_positive_predictions = predictions.count(1) or 1 # set to 1 if there are 0 predictions
+    num_real_positives = real.count(1) or 1 # set to 1 if there are 0 predictions
 
     proximity = (
         (1 / 3 * (close_matches / num_real_positives))

@@ -26,6 +26,8 @@ experiment_set_hash = get_random_hash(
 )  # global hash for all the experiments during this run.
 
 
+supported_datasets = ["city", "disease", "clinical", "wiki", "fiction", "committee", "product", "academic", "wiki50k"]
+
 @dataclass
 class CoherenceExperiment:
     num_samples: int = 50  # how many samples to test on
@@ -153,8 +155,8 @@ class SimpleExperiment:
             )  # get avg segment size
 
             # convert to strings so it can be used with the wd and pk metrics
-            pred_string = "".join(str(modified_predictions))
-            true_string = "".join(str(true_labels))
+            pred_string = "".join(map(str,modified_predictions))
+            true_string = "".join(map(str,true_labels))
 
             # calculate all the metrics we will be storing
             wd_score = windowdiff(pred_string, true_string, avg_k)

@@ -21,6 +21,8 @@ class DB:
         self.table_type = table_type
         if dataset_type in ["city", "disease"]:
             self.table_name = "wikisection_" + dataset_type
+        elif dataset_type in ["academic", "product", "committee"]:
+            self.table_name = "qmsum_" + dataset_type
         else:
             self.table_name = dataset_type
 
